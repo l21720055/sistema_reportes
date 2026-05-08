@@ -46,7 +46,7 @@ def actualizar_excel():
     df.to_excel(ARCHIVO_EXCEL, index=False)
 
 # =========================
-# GENERAR NUMERO
+# GENERAR NUMERO (CON BLOQUEO)
 # =========================
 def generar_numero():
     data = cargar_datos()
@@ -65,7 +65,7 @@ def generar_numero():
         return "R-001"
 
 # =========================
-# BUSCAR REPORTE POR NOMBRE Y TELÉFONO
+# BUSCAR REPORTE POR NOMBRE Y TELÉFONO (EXACTO)
 # =========================
 def buscar_reporte_por_nombre_telefono(nombre, telefono):
     data = cargar_datos()
@@ -82,29 +82,24 @@ def index():
     mensaje = None
     tipo_mensaje = "success"
     reporte_duplicado = None
-    nombre_buscado = ""
-    telefono_buscado = ""
 
     if request.method == "POST":
         nombre = request.form.get("nombre", "").strip()
         telefono = request.form.get("telefono", "").strip()
         veces = request.form.get("veces", "0")
 
-        nombre_buscado = nombre
-        telefono_buscado = telefono
-
         if not nombre or not telefono:
             mensaje = "Nombre y teléfono son obligatorios"
             tipo_mensaje = "danger"
         else:
-            # Verificar si ya existe un reporte con el mismo nombre y teléfono
+            # 🔥 VERIFICAR SI YA EXISTE UN REPORTE CON EL MISMO NOMBRE Y TELÉFONO
             reporte_existente = buscar_reporte_por_nombre_telefono(nombre, telefono)
             
             if reporte_existente:
-                # Si existe, guardar el reporte duplicado
-                reporte_duplicado = reporte_existente
-                mensaje = f"El reporte {reporte_existente['Numero']} ya existe."
+                # Si existe, no crear un nuevo reporte
+                mensaje = f"⚠️ El reporte {reporte_existente['Numero']} ya existe con ese nombre y teléfono."
                 tipo_mensaje = "warning"
+                reporte_duplicado = reporte_existente
             else:
                 # Si no existe, crear un nuevo reporte
                 dependencia = request.form.get("dependencia", "")
@@ -126,12 +121,17 @@ def index():
                 }
 
                 data = cargar_datos()
-                data.append(nuevo)
-                guardar_datos(data)
-                actualizar_excel()
-
-                mensaje = "Reporte guardado exitosamente"
-                tipo_mensaje = "success"
+                
+                # 🔥 VERIFICAR NUEVAMENTE (para evitar condiciones de carrera)
+                if buscar_reporte_por_nombre_telefono(nombre, telefono):
+                    mensaje = "⚠️ El reporte ya fue creado por otro usuario."
+                    tipo_mensaje = "warning"
+                else:
+                    data.append(nuevo)
+                    guardar_datos(data)
+                    actualizar_excel()
+                    mensaje = "Reporte guardado exitosamente"
+                    tipo_mensaje = "success"
 
     data = cargar_datos()
     total = len(data)
@@ -146,9 +146,7 @@ def index():
         total=total,
         todos_reportes=todos_reportes,
         ahora=datetime.now().strftime("%d/%m/%Y"),
-        reporte_duplicado=reporte_duplicado,
-        nombre_buscado=nombre_buscado,
-        telefono_buscado=telefono_buscado
+        reporte_duplicado=reporte_duplicado
     )
 
 # =========================
