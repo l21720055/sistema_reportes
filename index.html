@@ -61,13 +61,12 @@
             font-size: 0.8em;
         }
 
-        /* Reporte destacado en tiempo real */
         .list-group-item.match-found {
             border-left: 4px solid #ffc107;
             background-color: #fff3cd;
             transform: scale(1.02);
             box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-            order: -1; /* JavaScript moverá esto al inicio */
+            order: -1;
         }
 
         select:disabled, input:disabled {
@@ -140,7 +139,7 @@
             <p class="mb-0">
                 Fecha: {{ ahora }}
                 |
-                Total: {{ total }} reportes
+                Total: <span id="totalReportes">{{ total }}</span> reportes
             </p>
 
         </div>
@@ -352,6 +351,7 @@
             <!-- REPORTES -->
             <h5 class="mb-3">
                 📋 Todos los reportes
+                <span class="badge bg-secondary" id="contadorReportes">{{ total }}</span>
             </h5>
 
             <div class="list-group" id="reportesList">
@@ -596,12 +596,10 @@
             const itemNombre = item.getAttribute('data-nombre');
             const itemTelefono = item.getAttribute('data-telefono');
             
-            // Verificar coincidencia
             const coincideNombre = nombre !== '' && itemNombre.includes(nombre);
             const coincideTelefono = telefono !== '' && itemTelefono === telefono;
             const coincide = coincideNombre || coincideTelefono;
             
-            // Resetear estilos
             item.classList.remove('match-found');
             item.style.order = '';
             
@@ -614,12 +612,60 @@
             }
         });
         
-        // Si hay coincidencias, mover el primero al inicio
         if (primerMatch) {
             const parent = document.getElementById('reportesList');
             parent.prepend(primerMatch);
         }
     }
+
+    // 🔥 ACTUALIZACIÓN AUTOMÁTICA (POLLING) CADA 3 SEGUNDOS
+    function actualizarReportes() {
+        fetch('/api/reportes')
+            .then(response => response.json())
+            .then(data => {
+                const lista = document.getElementById('reportesList');
+                const totalSpan = document.getElementById('totalReportes');
+                const contador = document.getElementById('contadorReportes');
+                
+                // Actualizar contador
+                totalSpan.textContent = data.total;
+                contador.textContent = data.total;
+                
+                // Limpiar lista actual
+                lista.innerHTML = '';
+                
+                // Renderizar nuevos reportes
+                data.reportes.forEach(r => {
+                    const item = document.createElement('div');
+                    item.className = 'list-group-item d-flex justify-content-between align-items-center';
+                    item.setAttribute('data-nombre', r.Nombre.toLowerCase());
+                    item.setAttribute('data-telefono', r.Telefono);
+                    
+                    item.innerHTML = `
+                        <div>
+                            <strong>${r.Numero}</strong> - ${r.Nombre}
+                            <br>
+                            <small class="text-muted">${r.Tipo} | ${r.Dependencia}</small>
+                        </div>
+                        <div class="text-end">
+                            <span class="badge-phone">${r.Telefono}</span>
+                            <br>
+                            <button type="button" class="btn btn-sm btn-warning mt-2" data-bs-toggle="modal" data-bs-target="#editarModal" onclick="cargarEditar('${r.Numero}', '${r.Nombre}', '${r.Telefono}', '${r.Dependencia}', '${r.Tipo}', '${r.Veces}')">✏️ Editar</button>
+                            <a href="/delete/${r.Numero}" class="btn btn-sm btn-danger mt-2" onclick="return confirm('¿Eliminar reporte?')">🗑 Eliminar</a>
+                        </div>
+                    `;
+                    
+                    lista.appendChild(item);
+                });
+                
+                // Reaplicar búsqueda en tiempo real
+                buscarEnTiempoReal();
+            })
+            .catch(error => console.error('Error actualizando reportes:', error));
+    }
+
+    // Iniciar polling cada 3 segundos
+    setInterval(actualizarReportes, 3000);
 </script>
 
 </body>

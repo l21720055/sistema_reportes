@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, send_file
+from flask import Flask, render_template, request, redirect, send_file, jsonify
 import pandas as pd
 import json
 import os
@@ -136,8 +136,7 @@ def index():
     data = cargar_datos()
     total = len(data)
     
-    # MOSTRAR TODOS LOS REPORTES (no solo los últimos 5)
-    # Ordenar por número descendente (del más nuevo al más antiguo)
+    # MOSTRAR TODOS LOS REPORTES
     todos_reportes = sorted(data, key=lambda x: x['Numero'], reverse=True)
 
     return render_template(
@@ -151,6 +150,19 @@ def index():
         nombre_buscado=nombre_buscado,
         telefono_buscado=telefono_buscado
     )
+
+# =========================
+# API PARA ACTUALIZACIÓN AUTOMÁTICA (POLLING)
+# =========================
+@app.route("/api/reportes")
+def api_reportes():
+    data = cargar_datos()
+    total = len(data)
+    reportes = sorted(data, key=lambda x: x['Numero'], reverse=True)
+    return jsonify({
+        "total": total,
+        "reportes": reportes
+    })
 
 # =========================
 # EDITAR (NUEVA LÓGICA)
