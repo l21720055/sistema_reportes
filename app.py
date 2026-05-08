@@ -65,14 +65,14 @@ def generar_numero():
         return "R-001"
 
 # =========================
-# VALIDAR TELEFONO
+# BUSCAR REPORTE POR NOMBRE Y TELÉFONO
 # =========================
-def telefono_existe(telefono):
+def buscar_reporte_por_nombre_telefono(nombre, telefono):
     data = cargar_datos()
     for item in data:
-        if item.get('Telefono') == telefono:
-            return True
-    return False
+        if item.get('Nombre') == nombre and item.get('Telefono') == telefono:
+            return item
+    return None
 
 # =========================
 # INICIO
@@ -81,80 +81,79 @@ def telefono_existe(telefono):
 def index():
     mensaje = None
     tipo_mensaje = "success"
+    reporte_duplicado = None
+    nombre_buscado = ""
+    telefono_buscado = ""
 
     if request.method == "POST":
         nombre = request.form.get("nombre", "").strip()
         telefono = request.form.get("telefono", "").strip()
-
-        dependencia = request.form.get("dependencia", "")
-        dependencia_extra = request.form.get("dependencia_extra", "").strip()
-
-        tipo = request.form.get("tipo", "")
-        tipo_extra = request.form.get("tipo_extra", "").strip()
-
         veces = request.form.get("veces", "0")
+
+        nombre_buscado = nombre
+        telefono_buscado = telefono
 
         if not nombre or not telefono:
             mensaje = "Nombre y teléfono son obligatorios"
             tipo_mensaje = "danger"
-
-        elif telefono_existe(telefono):
-            mensaje = "Ese teléfono ya existe"
-            tipo_mensaje = "danger"
-
         else:
-            dependencia_final = dependencia_extra if dependencia_extra else dependencia
-            tipo_final = tipo_extra if tipo_extra else tipo
+            # Verificar si ya existe un reporte con el mismo nombre y teléfono
+            reporte_existente = buscar_reporte_por_nombre_telefono(nombre, telefono)
+            
+            if reporte_existente:
+                # Si existe, guardar el reporte duplicado
+                reporte_duplicado = reporte_existente
+                mensaje = f"El reporte {reporte_existente['Numero']} ya existe."
+                tipo_mensaje = "warning"
+            else:
+                # Si no existe, crear un nuevo reporte
+                dependencia = request.form.get("dependencia", "")
+                dependencia_extra = request.form.get("dependencia_extra", "").strip()
+                tipo = request.form.get("tipo", "")
+                tipo_extra = request.form.get("tipo_extra", "").strip()
 
-            nuevo = {
-                "Fecha": datetime.now().strftime("%d/%m/%Y"),
-                "Nombre": nombre,
-                "Telefono": telefono,
-                "Veces": veces,
-                "Dependencia": dependencia_final,
-                "Tipo": tipo_final,
-                "Numero": generar_numero()
-            }
+                dependencia_final = dependencia_extra if dependencia_extra else dependencia
+                tipo_final = tipo_extra if tipo_extra else tipo
 
-            data = cargar_datos()
-            data.append(nuevo)
-            guardar_datos(data)
-            actualizar_excel()
+                nuevo = {
+                    "Fecha": datetime.now().strftime("%d/%m/%Y"),
+                    "Nombre": nombre,
+                    "Telefono": telefono,
+                    "Veces": veces,
+                    "Dependencia": dependencia_final,
+                    "Tipo": tipo_final,
+                    "Numero": generar_numero()
+                }
 
-            mensaje = "Reporte guardado exitosamente"
-            tipo_mensaje = "success"
+                data = cargar_datos()
+                data.append(nuevo)
+                guardar_datos(data)
+                actualizar_excel()
+
+                mensaje = "Reporte guardado exitosamente"
+                tipo_mensaje = "success"
 
     data = cargar_datos()
     total = len(data)
-    ultimos = data[-5:][::-1] if data else []
+    
+    # MOSTRAR TODOS LOS REPORTES (no solo los últimos 5)
+    # Ordenar por número descendente (del más nuevo al más antiguo)
+    todos_reportes = sorted(data, key=lambda x: x['Numero'], reverse=True)
 
     return render_template(
         "index.html",
         mensaje=mensaje,
         tipo_mensaje=tipo_mensaje,
         total=total,
-        ultimos=ultimos,
-        ahora=datetime.now().strftime("%d/%m/%Y")
+        todos_reportes=todos_reportes,
+        ahora=datetime.now().strftime("%d/%m/%Y"),
+        reporte_duplicado=reporte_duplicado,
+        nombre_buscado=nombre_buscado,
+        telefono_buscado=telefono_buscado
     )
 
 # =========================
-# ELIMINAR
-# =========================
-@app.route('/delete/<numero>')
-def delete_reporte(numero):
-    try:
-        data = cargar_datos()
-        data = [item for item in data if item.get('Numero') != numero]
-        guardar_datos(data)
-        actualizar_excel()
-        return redirect('/')
-
-    except Exception as e:
-        print(f"Error al eliminar: {e}")
-        return redirect('/')
-
-# =========================
-# EDITAR
+# EDITAR (NUEVA LÓGICA)
 # =========================
 @app.route("/editar", methods=["POST"])
 def editar():
@@ -179,22 +178,62 @@ def editar():
 
         data = cargar_datos()
         
-        for item in data:
+        # Buscar el reporte original
+        reporte_original = None
+        indice_original = -1
+        for i, item in enumerate(data):
             if item.get('Numero') == numero:
-                item['Nombre'] = nuevo_nombre
-                item['Telefono'] = nuevo_telefono
-                item['Dependencia'] = dependencia_final
-                item['Tipo'] = tipo_final
-                item['Veces'] = veces
+                reporte_original = item
+                indice_original = i
                 break
         
-        guardar_datos(data)
-        actualizar_excel()
+        if reporte_original:
+            # Verificar si solo aumentó las veces o cambió algo más
+            if (reporte_original['Nombre'] == nuevo_nombre and 
+                reporte_original['Telefono'] == nuevo_telefono and
+                reporte_original['Dependencia'] == dependencia_final and
+                reporte_original['Tipo'] == tipo_final):
+                
+                # Solo aumentar veces
+                data[indice_original]['Veces'] = veces
+                mensaje = "Veces actualizadas correctamente"
+            else:
+                # Crear un nuevo reporte (no borrar el anterior)
+                nuevo_reporte = {
+                    "Fecha": datetime.now().strftime("%d/%m/%Y"),
+                    "Nombre": nuevo_nombre,
+                    "Telefono": nuevo_telefono,
+                    "Veces": veces,
+                    "Dependencia": dependencia_final,
+                    "Tipo": tipo_final,
+                    "Numero": generar_numero()
+                }
+                data.append(nuevo_reporte)
+                mensaje = "Nuevo reporte creado (el anterior se conserva)"
+            
+            guardar_datos(data)
+            actualizar_excel()
         
         return redirect('/')
 
     except Exception as e:
         print(f"Error al editar: {e}")
+        return redirect('/')
+
+# =========================
+# ELIMINAR
+# =========================
+@app.route('/delete/<numero>')
+def delete_reporte(numero):
+    try:
+        data = cargar_datos()
+        data = [item for item in data if item.get('Numero') != numero]
+        guardar_datos(data)
+        actualizar_excel()
+        return redirect('/')
+
+    except Exception as e:
+        print(f"Error al eliminar: {e}")
         return redirect('/')
 
 # =========================
