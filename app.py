@@ -1,0 +1,239 @@
+from flask import Flask, render_template, request, redirect, send_file
+import pandas as pd
+import json
+import os
+from datetime import datetime
+
+# PDF
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import letter
+
+app = Flask(__name__)
+app.secret_key = 'tu_clave_secreta_aqui'
+
+ARCHIVO_JSON = "reportes.json"
+ARCHIVO_EXCEL = "reportes.xlsx"
+
+# =========================
+# CARGAR DATOS
+# =========================
+def cargar_datos():
+    if not os.path.exists(ARCHIVO_JSON):
+        return []
+    try:
+        with open(ARCHIVO_JSON, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except:
+        return []
+
+# =========================
+# GUARDAR DATOS
+# =========================
+def guardar_datos(data):
+    with open(ARCHIVO_JSON, 'w', encoding='utf-8') as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
+
+# =========================
+# ACTUALIZAR EXCEL
+# =========================
+def actualizar_excel():
+    data = cargar_datos()
+    if not data:
+        return
+    
+    df = pd.DataFrame(data)
+    df.to_excel(ARCHIVO_EXCEL, index=False)
+
+# =========================
+# GENERAR NUMERO
+# =========================
+def generar_numero():
+    data = cargar_datos()
+    if not data:
+        return "R-001"
+    
+    try:
+        numeros = []
+        for item in data:
+            num_str = item.get('Numero', 'R-000')
+            num = int(num_str.replace('R-', ''))
+            numeros.append(num)
+        max_num = max(numeros)
+        return f"R-{max_num + 1:03d}"
+    except:
+        return "R-001"
+
+# =========================
+# VALIDAR TELEFONO
+# =========================
+def telefono_existe(telefono):
+    data = cargar_datos()
+    for item in data:
+        if item.get('Telefono') == telefono:
+            return True
+    return False
+
+# =========================
+# INICIO
+# =========================
+@app.route("/", methods=["GET", "POST"])
+def index():
+    mensaje = None
+    tipo_mensaje = "success"
+
+    if request.method == "POST":
+        nombre = request.form.get("nombre", "").strip()
+        telefono = request.form.get("telefono", "").strip()
+
+        dependencia = request.form.get("dependencia", "")
+        dependencia_extra = request.form.get("dependencia_extra", "").strip()
+
+        tipo = request.form.get("tipo", "")
+        tipo_extra = request.form.get("tipo_extra", "").strip()
+
+        veces = request.form.get("veces", "0")
+
+        if not nombre or not telefono:
+            mensaje = "Nombre y teléfono son obligatorios"
+            tipo_mensaje = "danger"
+
+        elif telefono_existe(telefono):
+            mensaje = "Ese teléfono ya existe"
+            tipo_mensaje = "danger"
+
+        else:
+            dependencia_final = dependencia_extra if dependencia_extra else dependencia
+            tipo_final = tipo_extra if tipo_extra else tipo
+
+            nuevo = {
+                "Fecha": datetime.now().strftime("%d/%m/%Y"),
+                "Nombre": nombre,
+                "Telefono": telefono,
+                "Veces": veces,
+                "Dependencia": dependencia_final,
+                "Tipo": tipo_final,
+                "Numero": generar_numero()
+            }
+
+            data = cargar_datos()
+            data.append(nuevo)
+            guardar_datos(data)
+            actualizar_excel()
+
+            mensaje = "Reporte guardado exitosamente"
+            tipo_mensaje = "success"
+
+    data = cargar_datos()
+    total = len(data)
+    ultimos = data[-5:][::-1] if data else []
+
+    return render_template(
+        "index.html",
+        mensaje=mensaje,
+        tipo_mensaje=tipo_mensaje,
+        total=total,
+        ultimos=ultimos,
+        ahora=datetime.now().strftime("%d/%m/%Y")
+    )
+
+# =========================
+# ELIMINAR
+# =========================
+@app.route('/delete/<numero>')
+def delete_reporte(numero):
+    try:
+        data = cargar_datos()
+        data = [item for item in data if item.get('Numero') != numero]
+        guardar_datos(data)
+        actualizar_excel()
+        return redirect('/')
+
+    except Exception as e:
+        print(f"Error al eliminar: {e}")
+        return redirect('/')
+
+# =========================
+# EDITAR
+# =========================
+@app.route("/editar", methods=["POST"])
+def editar():
+    try:
+        numero = request.form.get("numero_editar", "").strip()
+        nuevo_nombre = request.form.get("nombre_editar", "").strip()
+        nuevo_telefono = request.form.get("telefono_editar", "").strip()
+        
+        dependencia = request.form.get("dependencia_editar", "")
+        dependencia_extra = request.form.get("dependencia_extra_editar", "").strip()
+        
+        tipo = request.form.get("tipo_editar", "")
+        tipo_extra = request.form.get("tipo_extra_editar", "").strip()
+        
+        veces = request.form.get("veces_editar", "0")
+
+        if not numero or not nuevo_nombre or not nuevo_telefono:
+            return redirect('/')
+
+        dependencia_final = dependencia_extra if dependencia_extra else dependencia
+        tipo_final = tipo_extra if tipo_extra else tipo
+
+        data = cargar_datos()
+        
+        for item in data:
+            if item.get('Numero') == numero:
+                item['Nombre'] = nuevo_nombre
+                item['Telefono'] = nuevo_telefono
+                item['Dependencia'] = dependencia_final
+                item['Tipo'] = tipo_final
+                item['Veces'] = veces
+                break
+        
+        guardar_datos(data)
+        actualizar_excel()
+        
+        return redirect('/')
+
+    except Exception as e:
+        print(f"Error al editar: {e}")
+        return redirect('/')
+
+# =========================
+# EXPORTAR PDF
+# =========================
+@app.route("/pdf")
+def pdf():
+    from reportlab.lib.pagesizes import letter
+    
+    data = cargar_datos()
+    
+    if not data:
+        return "No hay reportes para mostrar.", 200
+
+    df = pd.DataFrame(data)
+
+    archivo = "reportes.pdf"
+    doc = SimpleDocTemplate(archivo, pagesize=letter)
+    elementos = []
+
+    datos = [list(df.columns)]
+    for fila in df.values:
+        datos.append(list(fila))
+
+    tabla = Table(datos)
+
+    tabla.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), colors.blue),
+        ('TEXTCOLOR', (0,0), (-1,0), colors.white),
+        ('GRID', (0,0), (-1,-1), 1, colors.black)
+    ]))
+
+    elementos.append(tabla)
+    doc.build(elementos)
+
+    return send_file(archivo, as_attachment=True)
+
+# =========================
+# EJECUTAR
+# =========================
+if __name__ == "__main__":
+    app.run(debug=True, host='0.0.0.0')
