@@ -119,7 +119,6 @@ def index():
 
                 data = cargar_datos()
                 
-                # Verificación final para evitar condiciones de carrera
                 if buscar_reporte_por_nombre_telefono(nombre, telefono):
                     mensaje = "⚠️ El reporte ya fue creado por otro usuario."
                     tipo_mensaje = "warning"
@@ -133,7 +132,7 @@ def index():
     data = cargar_datos()
     total = len(data)
     
-    # Mostrar todos los reportes
+    # Mostrar todos los reportes (ya no solo los últimos 5)
     todos_reportes = sorted(data, key=lambda x: x['Numero'], reverse=True)
 
     return render_template(

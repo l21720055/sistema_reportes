@@ -178,10 +178,8 @@
 
                         <input type="text"
                                name="nombre"
-                               id="nombreInput"
                                class="form-control"
-                               required
-                               oninput="buscarEnTiempoReal()">
+                               required>
 
                     </div>
 
@@ -194,12 +192,11 @@
 
                         <input type="tel"
                                name="telefono"
-                               id="telefonoInput"
                                class="form-control"
                                pattern="[0-9]+"
                                title="Solo se permiten números"
                                required
-                               oninput="this.value = this.value.replace(/[^0-9]/g, ''); buscarEnTiempoReal()">
+                               oninput="this.value = this.value.replace(/[^0-9]/g, '')">
 
                     </div>
 
@@ -240,7 +237,6 @@
 
                         <input type="text"
                                name="dependencia_extra"
-                               id="dependencia_extra"
                                class="form-control"
                                placeholder="Escribe otra dependencia..."
                                oninput="toggleSelect('dependencia', this.value)">
@@ -296,7 +292,6 @@
 
                         <input type="text"
                                name="tipo_extra"
-                               id="tipo_extra"
                                class="form-control"
                                placeholder="Escribe otro tipo..."
                                oninput="toggleSelect('tipo', this.value)">
@@ -421,7 +416,7 @@
 
 </div>
 
-<!-- MODAL EDITAR (SIN MÚLTIPLE) -->
+<!-- MODAL EDITAR -->
 <div class="modal fade" id="editarModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
@@ -435,26 +430,16 @@
                 <div class="modal-body">
                     <input type="hidden" name="numero_editar" id="numero_editar">
                     
-                    <!-- Nombre -->
                     <div class="mb-3">
                         <label class="form-label fw-bold">👤 Nombre</label>
                         <input type="text" name="nombre_editar" id="nombre_editar" class="form-control" required>
                     </div>
                     
-                    <!-- Teléfono (SOLO NÚMEROS) -->
                     <div class="mb-3">
                         <label class="form-label fw-bold">📞 Teléfono</label>
-                        <input type="tel"
-                               name="telefono_editar"
-                               id="telefono_editar"
-                               class="form-control"
-                               pattern="[0-9]+"
-                               title="Solo se permiten números"
-                               required
-                               oninput="this.value = this.value.replace(/[^0-9]/g, '')">
+                        <input type="tel" name="telefono_editar" id="telefono_editar" class="form-control" pattern="[0-9]+" title="Solo se permiten números" required oninput="this.value = this.value.replace(/[^0-9]/g, '')">
                     </div>
 
-                    <!-- Dependencia -->
                     <div class="mb-3">
                         <label class="form-label fw-bold">🏢 Dependencia</label>
                         <select name="dependencia_editar" id="dependencia_editar" class="form-select" onchange="toggleExtra('dependencia_extra_editar', this.value)">
@@ -467,7 +452,6 @@
                                oninput="toggleSelect('dependencia_editar', this.value)">
                     </div>
 
-                    <!-- Tipo -->
                     <div class="mb-3">
                         <label class="form-label fw-bold">📌 Tipo de Reporte</label>
                         <select name="tipo_editar" id="tipo_editar" class="form-select" onchange="toggleExtra('tipo_extra_editar', this.value)">
@@ -483,7 +467,6 @@
                                oninput="toggleSelect('tipo_editar', this.value)">
                     </div>
 
-                    <!-- Veces -->
                     <div class="mb-3">
                         <label class="form-label fw-bold">🔢 Veces reportado</label>
                         <input type="number" name="veces_editar" id="veces_editar" class="form-control" placeholder="0" style="width: 120px;">
@@ -501,7 +484,6 @@
 
 <!-- SCRIPT PARA FUNCIONALIDADES -->
 <script>
-    // Deshabilitar select cuando se escribe en el campo extra
     function toggleSelect(selectId, inputValue) {
         const select = document.getElementById(selectId);
         if (inputValue.trim() !== '') {
@@ -513,7 +495,6 @@
         }
     }
 
-    // Deshabilitar campo extra cuando se selecciona una opción en el select
     function toggleExtra(extraId, selectValue) {
         const extra = document.getElementById(extraId);
         if (selectValue !== 'Seleccione...') {
@@ -525,7 +506,6 @@
         }
     }
 
-    // Cargar datos en el modal de edición
     function cargarEditar(numero, nombre, telefono, dependencia, tipo, veces) {
         document.getElementById('numero_editar').value = numero;
         document.getElementById('nombre_editar').value = nombre;
@@ -533,12 +513,10 @@
         
         const depSelect = document.getElementById('dependencia_editar');
         const depExtra = document.getElementById('dependencia_extra_editar');
-        
         depSelect.selectedIndex = 0;
         depExtra.value = '';
         depExtra.disabled = true;
         depExtra.style.backgroundColor = '#e9ecef';
-        
         let encontrado = false;
         for (let i = 0; i < depSelect.options.length; i++) {
             if (depSelect.options[i].value === dependencia) {
@@ -558,12 +536,10 @@
         
         const tipoSelect = document.getElementById('tipo_editar');
         const tipoExtra = document.getElementById('tipo_extra_editar');
-        
         tipoSelect.selectedIndex = 0;
         tipoExtra.value = '';
         tipoExtra.disabled = true;
         tipoExtra.style.backgroundColor = '#e9ecef';
-        
         encontrado = false;
         for (let i = 0; i < tipoSelect.options.length; i++) {
             if (tipoSelect.options[i].value === tipo) {
@@ -584,41 +560,7 @@
         document.getElementById('veces_editar').value = veces || '0';
     }
 
-    // 🔥 BÚSQUEDA EN TIEMPO REAL
-    function buscarEnTiempoReal() {
-        const nombre = document.getElementById('nombreInput').value.toLowerCase().trim();
-        const telefono = document.getElementById('telefonoInput').value.trim();
-        const items = document.querySelectorAll('#reportesList .list-group-item');
-        
-        let primerMatch = null;
-        
-        items.forEach(item => {
-            const itemNombre = item.getAttribute('data-nombre');
-            const itemTelefono = item.getAttribute('data-telefono');
-            
-            const coincideNombre = nombre !== '' && itemNombre.includes(nombre);
-            const coincideTelefono = telefono !== '' && itemTelefono === telefono;
-            const coincide = coincideNombre || coincideTelefono;
-            
-            item.classList.remove('match-found');
-            item.style.order = '';
-            
-            if (coincide) {
-                item.classList.add('match-found');
-                item.style.order = '-1';
-                if (!primerMatch) {
-                    primerMatch = item;
-                }
-            }
-        });
-        
-        if (primerMatch) {
-            const parent = document.getElementById('reportesList');
-            parent.prepend(primerMatch);
-        }
-    }
-
-    // 🔥 ACTUALIZACIÓN AUTOMÁTICA (POLLING) CADA 3 SEGUNDOS
+    // 🔥 POLLING CADA 3 SEGUNDOS
     function actualizarReportes() {
         fetch('/api/reportes')
             .then(response => response.json())
@@ -627,20 +569,17 @@
                 const totalSpan = document.getElementById('totalReportes');
                 const contador = document.getElementById('contadorReportes');
                 
-                // Actualizar contador
-                totalSpan.textContent = data.total;
-                contador.textContent = data.total;
+                if (totalSpan) totalSpan.textContent = data.total;
+                if (contador) contador.textContent = data.total;
                 
-                // Limpiar lista actual
+                if (!lista) return;
                 lista.innerHTML = '';
                 
-                // Renderizar nuevos reportes
                 data.reportes.forEach(r => {
                     const item = document.createElement('div');
                     item.className = 'list-group-item d-flex justify-content-between align-items-center';
                     item.setAttribute('data-nombre', r.Nombre.toLowerCase());
                     item.setAttribute('data-telefono', r.Telefono);
-                    
                     item.innerHTML = `
                         <div>
                             <strong>${r.Numero}</strong> - ${r.Nombre}
@@ -654,17 +593,13 @@
                             <a href="/delete/${r.Numero}" class="btn btn-sm btn-danger mt-2" onclick="return confirm('¿Eliminar reporte?')">🗑 Eliminar</a>
                         </div>
                     `;
-                    
                     lista.appendChild(item);
                 });
-                
-                // Reaplicar búsqueda en tiempo real
-                buscarEnTiempoReal();
             })
             .catch(error => console.error('Error actualizando reportes:', error));
     }
 
-    // Iniciar polling cada 3 segundos
+    // Iniciar polling
     setInterval(actualizarReportes, 3000);
 </script>
 
