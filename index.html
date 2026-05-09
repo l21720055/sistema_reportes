@@ -50,7 +50,6 @@
         .list-group-item {
             border-left: 4px solid #1a73e8;
             margin-bottom: 5px;
-            transition: all 0.3s ease;
         }
 
         .badge-phone {
@@ -59,14 +58,6 @@
             padding: 2px 10px;
             border-radius: 12px;
             font-size: 0.8em;
-        }
-
-        .list-group-item.match-found {
-            border-left: 4px solid #ffc107;
-            background-color: #fff3cd;
-            transform: scale(1.02);
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-            order: -1;
         }
 
         select:disabled, input:disabled {
@@ -139,7 +130,7 @@
             <p class="mb-0">
                 Fecha: {{ ahora }}
                 |
-                Total: <span id="totalReportes">{{ total }}</span> reportes
+                Total: {{ total }} reportes
             </p>
 
         </div>
@@ -165,7 +156,7 @@
             {% endif %}
 
             <!-- FORMULARIO -->
-            <form method="POST" id="reporteForm">
+            <form method="POST">
 
                 <div class="row g-3">
 
@@ -346,14 +337,13 @@
             <!-- REPORTES -->
             <h5 class="mb-3">
                 📋 Todos los reportes
-                <span class="badge bg-secondary" id="contadorReportes">{{ total }}</span>
             </h5>
 
-            <div class="list-group" id="reportesList">
+            <div class="list-group">
+
                 {% for r in todos_reportes %}
-                <div class="list-group-item d-flex justify-content-between align-items-center"
-                     data-nombre="{{ r.Nombre|lower }}"
-                     data-telefono="{{ r.Telefono }}">
+
+                <div class="list-group-item d-flex justify-content-between align-items-center">
 
                     <div>
 
@@ -407,7 +397,9 @@
                     </div>
 
                 </div>
+
                 {% endfor %}
+
             </div>
 
         </div>
@@ -559,48 +551,6 @@
         
         document.getElementById('veces_editar').value = veces || '0';
     }
-
-    // 🔥 POLLING CADA 3 SEGUNDOS
-    function actualizarReportes() {
-        fetch('/api/reportes')
-            .then(response => response.json())
-            .then(data => {
-                const lista = document.getElementById('reportesList');
-                const totalSpan = document.getElementById('totalReportes');
-                const contador = document.getElementById('contadorReportes');
-                
-                if (totalSpan) totalSpan.textContent = data.total;
-                if (contador) contador.textContent = data.total;
-                
-                if (!lista) return;
-                lista.innerHTML = '';
-                
-                data.reportes.forEach(r => {
-                    const item = document.createElement('div');
-                    item.className = 'list-group-item d-flex justify-content-between align-items-center';
-                    item.setAttribute('data-nombre', r.Nombre.toLowerCase());
-                    item.setAttribute('data-telefono', r.Telefono);
-                    item.innerHTML = `
-                        <div>
-                            <strong>${r.Numero}</strong> - ${r.Nombre}
-                            <br>
-                            <small class="text-muted">${r.Tipo} | ${r.Dependencia}</small>
-                        </div>
-                        <div class="text-end">
-                            <span class="badge-phone">${r.Telefono}</span>
-                            <br>
-                            <button type="button" class="btn btn-sm btn-warning mt-2" data-bs-toggle="modal" data-bs-target="#editarModal" onclick="cargarEditar('${r.Numero}', '${r.Nombre}', '${r.Telefono}', '${r.Dependencia}', '${r.Tipo}', '${r.Veces}')">✏️ Editar</button>
-                            <a href="/delete/${r.Numero}" class="btn btn-sm btn-danger mt-2" onclick="return confirm('¿Eliminar reporte?')">🗑 Eliminar</a>
-                        </div>
-                    `;
-                    lista.appendChild(item);
-                });
-            })
-            .catch(error => console.error('Error actualizando reportes:', error));
-    }
-
-    // Iniciar polling
-    setInterval(actualizarReportes, 3000);
 </script>
 
 </body>

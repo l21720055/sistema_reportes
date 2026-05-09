@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, send_file, jsonify
+from flask import Flask, render_template, request, redirect, send_file
 import pandas as pd
 import json
 import os
@@ -118,21 +118,17 @@ def index():
                 }
 
                 data = cargar_datos()
-                
-                if buscar_reporte_por_nombre_telefono(nombre, telefono):
-                    mensaje = "⚠️ El reporte ya fue creado por otro usuario."
-                    tipo_mensaje = "warning"
-                else:
-                    data.append(nuevo)
-                    guardar_datos(data)
-                    actualizar_excel()
-                    mensaje = "Reporte guardado exitosamente"
-                    tipo_mensaje = "success"
+                data.append(nuevo)
+                guardar_datos(data)
+                actualizar_excel()
+
+                mensaje = "Reporte guardado exitosamente"
+                tipo_mensaje = "success"
 
     data = cargar_datos()
     total = len(data)
     
-    # Mostrar todos los reportes (ya no solo los últimos 5)
+    # MOSTRAR TODOS LOS REPORTES
     todos_reportes = sorted(data, key=lambda x: x['Numero'], reverse=True)
 
     return render_template(
@@ -144,19 +140,6 @@ def index():
         ahora=datetime.now().strftime("%d/%m/%Y"),
         reporte_duplicado=reporte_duplicado
     )
-
-# =========================
-# API PARA ACTUALIZACIÓN AUTOMÁTICA (POLLING)
-# =========================
-@app.route("/api/reportes")
-def api_reportes():
-    data = cargar_datos()
-    total = len(data)
-    reportes = sorted(data, key=lambda x: x['Numero'], reverse=True)
-    return jsonify({
-        "total": total,
-        "reportes": reportes
-    })
 
 # =========================
 # EDITAR
@@ -184,37 +167,17 @@ def editar():
 
         data = cargar_datos()
         
-        reporte_original = None
-        indice_original = -1
-        for i, item in enumerate(data):
+        for item in data:
             if item.get('Numero') == numero:
-                reporte_original = item
-                indice_original = i
+                item['Nombre'] = nuevo_nombre
+                item['Telefono'] = nuevo_telefono
+                item['Dependencia'] = dependencia_final
+                item['Tipo'] = tipo_final
+                item['Veces'] = veces
                 break
         
-        if reporte_original:
-            if (reporte_original['Nombre'] == nuevo_nombre and 
-                reporte_original['Telefono'] == nuevo_telefono and
-                reporte_original['Dependencia'] == dependencia_final and
-                reporte_original['Tipo'] == tipo_final):
-                
-                data[indice_original]['Veces'] = veces
-                mensaje = "Veces actualizadas correctamente"
-            else:
-                nuevo_reporte = {
-                    "Fecha": datetime.now().strftime("%d/%m/%Y"),
-                    "Nombre": nuevo_nombre,
-                    "Telefono": nuevo_telefono,
-                    "Veces": veces,
-                    "Dependencia": dependencia_final,
-                    "Tipo": tipo_final,
-                    "Numero": generar_numero()
-                }
-                data.append(nuevo_reporte)
-                mensaje = "Nuevo reporte creado (el anterior se conserva)"
-            
-            guardar_datos(data)
-            actualizar_excel()
+        guardar_datos(data)
+        actualizar_excel()
         
         return redirect('/')
 
