@@ -1,8 +1,7 @@
 from flask import Flask, render_template, request, redirect, send_file
 import pandas as pd
-import json
-import os
 from datetime import datetime
+import os
 
 # PDF
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
@@ -12,50 +11,22 @@ from reportlab.lib.pagesizes import letter
 app = Flask(__name__)
 app.secret_key = 'tu_clave_secreta_aqui'
 
-ARCHIVO_JSON = "reportes.json"
-ARCHIVO_EXCEL = "reportes.xlsx"
-
 # =========================
-# CARGAR DATOS
+# DATOS EN MEMORIA (NO DEPENDE DE ARCHIVOS)
 # =========================
-def cargar_datos():
-    if not os.path.exists(ARCHIVO_JSON):
-        return []
-    try:
-        with open(ARCHIVO_JSON, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    except:
-        return []
-
-# =========================
-# GUARDAR DATOS
-# =========================
-def guardar_datos(data):
-    with open(ARCHIVO_JSON, 'w', encoding='utf-8') as f:
-        json.dump(data, f, indent=2, ensure_ascii=False)
-
-# =========================
-# ACTUALIZAR EXCEL
-# =========================
-def actualizar_excel():
-    data = cargar_datos()
-    if not data:
-        return
-    
-    df = pd.DataFrame(data)
-    df.to_excel(ARCHIVO_EXCEL, index=False)
+# Esta lista guarda todos los reportes mientras el servidor esté encendido
+reportes_memoria = []
 
 # =========================
 # GENERAR NUMERO
 # =========================
 def generar_numero():
-    data = cargar_datos()
-    if not data:
+    if not reportes_memoria:
         return "R-001"
     
     try:
         numeros = []
-        for item in data:
+        for item in reportes_memoria:
             num_str = item.get('Numero', 'R-000')
             num = int(num_str.replace('R-', ''))
             numeros.append(num)
@@ -68,8 +39,7 @@ def generar_numero():
 # BUSCAR REPORTE POR NOMBRE Y TELÉFONO
 # =========================
 def buscar_reporte_por_nombre_telefono(nombre, telefono):
-    data = cargar_datos()
-    for item in data:
+    for item in reportes_memoria:
         if item.get('Nombre') == nombre and item.get('Telefono') == telefono:
             return item
     return None
@@ -117,19 +87,14 @@ def index():
                     "Numero": generar_numero()
                 }
 
-                data = cargar_datos()
-                data.append(nuevo)
-                guardar_datos(data)
-                actualizar_excel()
-
+                reportes_memoria.append(nuevo)
                 mensaje = "Reporte guardado exitosamente"
                 tipo_mensaje = "success"
 
-    data = cargar_datos()
-    total = len(data)
+    total = len(reportes_memoria)
     
-    # MOSTRAR TODOS LOS REPORTES
-    todos_reportes = sorted(data, key=lambda x: x['Numero'], reverse=True)
+    # Mostrar todos los reportes
+    todos_reportes = sorted(reportes_memoria, key=lambda x: x['Numero'], reverse=True)
 
     return render_template(
         "index.html",
@@ -165,9 +130,7 @@ def editar():
         dependencia_final = dependencia_extra if dependencia_extra else dependencia
         tipo_final = tipo_extra if tipo_extra else tipo
 
-        data = cargar_datos()
-        
-        for item in data:
+        for item in reportes_memoria:
             if item.get('Numero') == numero:
                 item['Nombre'] = nuevo_nombre
                 item['Telefono'] = nuevo_telefono
@@ -175,9 +138,6 @@ def editar():
                 item['Tipo'] = tipo_final
                 item['Veces'] = veces
                 break
-        
-        guardar_datos(data)
-        actualizar_excel()
         
         return redirect('/')
 
@@ -191,10 +151,8 @@ def editar():
 @app.route('/delete/<numero>')
 def delete_reporte(numero):
     try:
-        data = cargar_datos()
-        data = [item for item in data if item.get('Numero') != numero]
-        guardar_datos(data)
-        actualizar_excel()
+        global reportes_memoria
+        reportes_memoria = [item for item in reportes_memoria if item.get('Numero') != numero]
         return redirect('/')
 
     except Exception as e:
@@ -208,12 +166,10 @@ def delete_reporte(numero):
 def pdf():
     from reportlab.lib.pagesizes import letter
     
-    data = cargar_datos()
-    
-    if not data:
+    if not reportes_memoria:
         return "No hay reportes para mostrar.", 200
 
-    df = pd.DataFrame(data)
+    df = pd.DataFrame(reportes_memoria)
 
     archivo = "reportes.pdf"
     doc = SimpleDocTemplate(archivo, pagesize=letter)
