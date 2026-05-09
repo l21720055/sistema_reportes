@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, redirect, send_file
-import pandas as pd
+from pymongo import MongoClient
 from datetime import datetime
 import os
 
@@ -12,26 +12,32 @@ app = Flask(__name__)
 app.secret_key = 'tu_clave_secreta_aqui'
 
 # =========================
-# DATOS EN MEMORIA (NO DEPENDE DE ARCHIVOS)
+# CONEXIÓN A MONGODB
 # =========================
-# Esta lista guarda todos los reportes mientras el servidor esté encendido
-reportes_memoria = []
+# 🔥 REEMPLAZA <db_password> CON TU CONTRASEÑA REAL
+MONGO_URI = "mongodb+srv://mariaxd:<cris123>@cluster0.svaktzr.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
+
+try:
+    client = MongoClient(MONGO_URI)
+    db = client['sistema_reportes']  # Nombre de la base de datos
+    coleccion = db['reportes']        # Nombre de la colección
+    print("✅ Conectado a MongoDB Atlas")
+except Exception as e:
+    print(f"❌ Error conectando a MongoDB: {e}")
 
 # =========================
 # GENERAR NUMERO
 # =========================
 def generar_numero():
-    if not reportes_memoria:
+    # Obtener el último reporte
+    ultimo = coleccion.find_one(sort=[('Numero', -1)])
+    if not ultimo:
         return "R-001"
     
     try:
-        numeros = []
-        for item in reportes_memoria:
-            num_str = item.get('Numero', 'R-000')
-            num = int(num_str.replace('R-', ''))
-            numeros.append(num)
-        max_num = max(numeros)
-        return f"R-{max_num + 1:03d}"
+        num_str = ultimo.get('Numero', 'R-000')
+        num = int(num_str.replace('R-', ''))
+        return f"R-{num + 1:03d}"
     except:
         return "R-001"
 
@@ -39,10 +45,10 @@ def generar_numero():
 # BUSCAR REPORTE POR NOMBRE Y TELÉFONO
 # =========================
 def buscar_reporte_por_nombre_telefono(nombre, telefono):
-    for item in reportes_memoria:
-        if item.get('Nombre') == nombre and item.get('Telefono') == telefono:
-            return item
-    return None
+    return coleccion.find_one({
+        'Nombre': nombre,
+        'Telefono': telefono
+    })
 
 # =========================
 # INICIO
@@ -87,14 +93,13 @@ def index():
                     "Numero": generar_numero()
                 }
 
-                reportes_memoria.append(nuevo)
+                coleccion.insert_one(nuevo)
                 mensaje = "Reporte guardado exitosamente"
                 tipo_mensaje = "success"
 
-    total = len(reportes_memoria)
-    
-    # Mostrar todos los reportes
-    todos_reportes = sorted(reportes_memoria, key=lambda x: x['Numero'], reverse=True)
+    # Obtener todos los reportes desde MongoDB
+    todos_reportes = list(coleccion.find().sort('Numero', -1))
+    total = len(todos_reportes)
 
     return render_template(
         "index.html",
@@ -130,14 +135,17 @@ def editar():
         dependencia_final = dependencia_extra if dependencia_extra else dependencia
         tipo_final = tipo_extra if tipo_extra else tipo
 
-        for item in reportes_memoria:
-            if item.get('Numero') == numero:
-                item['Nombre'] = nuevo_nombre
-                item['Telefono'] = nuevo_telefono
-                item['Dependencia'] = dependencia_final
-                item['Tipo'] = tipo_final
-                item['Veces'] = veces
-                break
+        # Actualizar en MongoDB
+        coleccion.update_one(
+            {'Numero': numero},
+            {'$set': {
+                'Nombre': nuevo_nombre,
+                'Telefono': nuevo_telefono,
+                'Dependencia': dependencia_final,
+                'Tipo': tipo_final,
+                'Veces': veces
+            }}
+        )
         
         return redirect('/')
 
@@ -151,8 +159,7 @@ def editar():
 @app.route('/delete/<numero>')
 def delete_reporte(numero):
     try:
-        global reportes_memoria
-        reportes_memoria = [item for item in reportes_memoria if item.get('Numero') != numero]
+        coleccion.delete_one({'Numero': numero})
         return redirect('/')
 
     except Exception as e:
@@ -166,10 +173,12 @@ def delete_reporte(numero):
 def pdf():
     from reportlab.lib.pagesizes import letter
     
-    if not reportes_memoria:
+    todos_reportes = list(coleccion.find().sort('Numero', -1))
+    
+    if not todos_reportes:
         return "No hay reportes para mostrar.", 200
 
-    df = pd.DataFrame(reportes_memoria)
+    df = pd.DataFrame(todos_reportes)
 
     archivo = "reportes.pdf"
     doc = SimpleDocTemplate(archivo, pagesize=letter)
