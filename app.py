@@ -46,7 +46,7 @@ def actualizar_excel():
     df.to_excel(ARCHIVO_EXCEL, index=False)
 
 # =========================
-# GENERAR NUMERO (CON BLOQUEO)
+# GENERAR NUMERO
 # =========================
 def generar_numero():
     data = cargar_datos()
@@ -65,7 +65,7 @@ def generar_numero():
         return "R-001"
 
 # =========================
-# BUSCAR REPORTE POR NOMBRE Y TELÉFONO (EXACTO)
+# BUSCAR REPORTE POR NOMBRE Y TELÉFONO
 # =========================
 def buscar_reporte_por_nombre_telefono(nombre, telefono):
     data = cargar_datos()
@@ -92,16 +92,13 @@ def index():
             mensaje = "Nombre y teléfono son obligatorios"
             tipo_mensaje = "danger"
         else:
-            # 🔥 VERIFICAR SI YA EXISTE UN REPORTE CON EL MISMO NOMBRE Y TELÉFONO
             reporte_existente = buscar_reporte_por_nombre_telefono(nombre, telefono)
             
             if reporte_existente:
-                # Si existe, no crear un nuevo reporte
-                mensaje = f"⚠️ El reporte {reporte_existente['Numero']} ya existe con ese nombre y teléfono."
+                mensaje = f"⚠️ El reporte {reporte_existente['Numero']} ya existe."
                 tipo_mensaje = "warning"
                 reporte_duplicado = reporte_existente
             else:
-                # Si no existe, crear un nuevo reporte
                 dependencia = request.form.get("dependencia", "")
                 dependencia_extra = request.form.get("dependencia_extra", "").strip()
                 tipo = request.form.get("tipo", "")
@@ -122,7 +119,7 @@ def index():
 
                 data = cargar_datos()
                 
-                # 🔥 VERIFICAR NUEVAMENTE (para evitar condiciones de carrera)
+                # Verificación final para evitar condiciones de carrera
                 if buscar_reporte_por_nombre_telefono(nombre, telefono):
                     mensaje = "⚠️ El reporte ya fue creado por otro usuario."
                     tipo_mensaje = "warning"
@@ -136,7 +133,7 @@ def index():
     data = cargar_datos()
     total = len(data)
     
-    # MOSTRAR TODOS LOS REPORTES
+    # Mostrar todos los reportes
     todos_reportes = sorted(data, key=lambda x: x['Numero'], reverse=True)
 
     return render_template(
@@ -163,7 +160,7 @@ def api_reportes():
     })
 
 # =========================
-# EDITAR (NUEVA LÓGICA)
+# EDITAR
 # =========================
 @app.route("/editar", methods=["POST"])
 def editar():
@@ -188,7 +185,6 @@ def editar():
 
         data = cargar_datos()
         
-        # Buscar el reporte original
         reporte_original = None
         indice_original = -1
         for i, item in enumerate(data):
@@ -198,17 +194,14 @@ def editar():
                 break
         
         if reporte_original:
-            # Verificar si solo aumentó las veces o cambió algo más
             if (reporte_original['Nombre'] == nuevo_nombre and 
                 reporte_original['Telefono'] == nuevo_telefono and
                 reporte_original['Dependencia'] == dependencia_final and
                 reporte_original['Tipo'] == tipo_final):
                 
-                # Solo aumentar veces
                 data[indice_original]['Veces'] = veces
                 mensaje = "Veces actualizadas correctamente"
             else:
-                # Crear un nuevo reporte (no borrar el anterior)
                 nuevo_reporte = {
                     "Fecha": datetime.now().strftime("%d/%m/%Y"),
                     "Nombre": nuevo_nombre,
